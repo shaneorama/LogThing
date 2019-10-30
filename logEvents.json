@@ -1,0 +1,11 @@
+{
+  "@timestamp": "2019-09-20T19:31:27.125+00:00",
+  "@version": "1",
+  "message": "----> AssetAccessAdapter.allocateAssets(Product(trustwell_certified_gold_gas_mmbtu,NaturalGas,cbl,MMBtus,List(Attribute(Certification: IES Trustwell Certification Gold))),4edb958f-b1d6-4b4c-9387-4d52ad4a3cc4)",
+  "logger_name": "com.xpansiv.commons.adapters.LoggingAdapter",
+  "thread_name": "scala-execution-context-global-64",
+  "level": "DEBUG",
+  "level_value": 10000,
+  "dd.span_id": "8790428135326281763",
+  "dd.trace_id": "7225559116343098043"
+}
