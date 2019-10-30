@@ -2,19 +2,20 @@ package logproc
 
 import java.time.{LocalDateTime, ZoneOffset}
 
-import scala.util.matching.Regex
+import scala.io.Source
+import Serde.formatter
 
 object LogProc extends App {
+  val callPatternString: String = "----> (\\w+(?:\\.\\w+)+)\\((.*)\\)"
+  val returnPatternString: String = "<----\\[(\\d+\\.\\d+)] (\\w+(?:\\.\\w+)+) => (.*)"
 
-  val service = "inventory"
-  val logGroup = "/ecs/platform-uat"
-  val eventTime = System.currentTimeMillis() - (1000 * 60 * 5) // 5 mins ago
+  val callPattern = callPatternString.r
+  val returnPattern = returnPatternString.r
 
-  val callPattern: Regex = "----> (\\w+(?:\\.\\w+)+)\\((.*)\\)".r
-  val returnPattern: Regex = "<----\\[(\\d+\\.\\d+)] (\\w+(?:\\.\\w+)+) => (.*)".r
+  val callPatternLog = s"(.*?) DEBUG .*? \\[(.*?)] .*? $callPatternString".r
+  val returnPatternLog = s"(.*?) DEBUG .*? \\[(.*?)] .*? $returnPatternString".r
 
-  val logs: Seq[LogStatement] = CloudWatch.logs(service, logGroup, None)
-  val funcLogs: Seq[FunctionLog] = parseLogs(logs)
+  val funcLogs: Seq[FunctionLog] = parseLocalLogs("<log file here>") // <--------------------------- log file here
   val threadMap: Map[String,Seq[FunctionLog]] = mapThreads(funcLogs)
 
   threadMap.foreach { case (thread, logs) =>
@@ -33,7 +34,39 @@ object LogProc extends App {
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+  def parseAWSLogs(service: String, logGroup: String): Seq[FunctionLog] = {
+//    val service = "inventory"
+//    val logGroup = "/ecs/platform-uat"
+    parseLogs(CloudWatch.logs(service, logGroup, None))
+  }
 
+  def parseLocalLogs(file: String): Seq[FunctionLog] = {
+    val logFile = Source.fromFile(file, "utf-8")
+    logFile.getLines
+      .filter(line => line.startsWith("---->") || line.startsWith("<----"))
+      .map {
+        case callPatternLog(timestampString, thread, func, args) =>
+          val timestamp = LocalDateTime.parse(timestampString,formatter)
+          FunctionCall(timestamp, thread, func, args)
+        case returnPatternLog(timestampString, thread, elapsedTime, func, returnVal) =>
+          val timestamp = LocalDateTime.parse(timestampString,formatter)
+          FunctionReturn(timestamp, thread, func, returnVal, elapsedTime.toDouble)
+      }.toSeq
+  }
+
+  def parseLogs(logs: Seq[LogStatement]): Seq[FunctionLog] = logs.flatMap { log =>
+    val timestamp = log.timestamp
+    val thread = log.thread
+
+    log.message match {
+      case callPattern(func, args) =>
+        Seq(FunctionCall(timestamp, thread, func, args))
+      case returnPattern(elapsedTime, func, returnVal) =>
+        Seq(FunctionReturn(timestamp, thread, func, returnVal, elapsedTime.toDouble))
+      case _ =>
+        Seq.empty
+    }
+  }
 
   def profile(head: FunctionCall, tail: Seq[FunctionLog]): FunctionTree = tail match {
     case (ret:FunctionReturn) :: Nil if(head.function == ret.function) =>
@@ -50,19 +83,5 @@ object LogProc extends App {
     .map {
       case (thread, logs) => (thread, logs.sortBy(_.timestamp.toEpochSecond(ZoneOffset.UTC)))
     }
-
-  def parseLogs(logs: Seq[LogStatement]): Seq[FunctionLog] = logs.flatMap { log =>
-    val timestamp = log.timestamp
-    val thread = log.thread
-
-    log.message match {
-      case callPattern(func, args) =>
-        Seq(FunctionCall(timestamp, thread, func, args))
-      case returnPattern(elapsedTime, func, returnVal) =>
-        Seq(FunctionReturn(timestamp, thread, func, returnVal, elapsedTime.toDouble))
-      case _ =>
-        Seq.empty
-    }
-  }
 }
 

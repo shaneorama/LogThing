@@ -1,0 +1,5 @@
+package logproc
+
+class FSLogParser {
+
+}
