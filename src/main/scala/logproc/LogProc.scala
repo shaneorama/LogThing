@@ -10,8 +10,8 @@ object LogProc extends App {
   val formatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 
 
-  val callPatternString: String = "----> ((?:\\w|$)+(?:\\.\\w+)+)\\((.*)\\)"
-  val returnPatternString: String = "<----\\[(\\d+\\.\\d+)] (\\w+(?:\\.\\w+)+) => (.*)"
+  val callPatternString: String = "----> ((?:\\w|\\$)+(?:\\.\\w+)+)\\((.*)\\)"
+  val returnPatternString: String = "<----\\[(\\d+\\.\\d+)] ((?:\\w|\\$)+(?:\\.(?:\\w|\\$)+)+) => (.*)"
 
   val callPattern = callPatternString.r
   val returnPattern = returnPatternString.r
@@ -48,10 +48,6 @@ object LogProc extends App {
     val logFile = Source.fromFile(file, "utf-8")
     logFile.getLines
       .filter(line => (line.contains("---->") || line.contains("<----")))
-      .map(i => {
-        println(i)
-        i
-      })
       .map {
         case callPatternLog(timestampString, thread, func, args) =>
           val timestamp = LocalDateTime.parse(timestampString,formatter)
