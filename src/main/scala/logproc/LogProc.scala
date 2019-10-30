@@ -1,21 +1,25 @@
 package logproc
 
+import java.text.SimpleDateFormat
+import java.time.format.DateTimeFormatter
 import java.time.{LocalDateTime, ZoneOffset}
 
 import scala.io.Source
-import Serde.formatter
 
 object LogProc extends App {
-  val callPatternString: String = "----> (\\w+(?:\\.\\w+)+)\\((.*)\\)"
+  val formatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+
+
+  val callPatternString: String = "----> ((?:\\w|$)+(?:\\.\\w+)+)\\((.*)\\)"
   val returnPatternString: String = "<----\\[(\\d+\\.\\d+)] (\\w+(?:\\.\\w+)+) => (.*)"
 
   val callPattern = callPatternString.r
   val returnPattern = returnPatternString.r
 
-  val callPatternLog = s"(.*?) DEBUG .*? \\[(.*?)] .*? $callPatternString".r
-  val returnPatternLog = s"(.*?) DEBUG .*? \\[(.*?)] .*? $returnPatternString".r
+  val callPatternLog = s"(.*) DEBUG .* \\[(.*)] .* $callPatternString".r
+  val returnPatternLog = s"(.*) DEBUG .* \\[(.*)] .* $returnPatternString".r
 
-  val funcLogs: Seq[FunctionLog] = parseLocalLogs("<log file here>") // <--------------------------- log file here
+  val funcLogs: Seq[FunctionLog] = parseLocalLogs("logs.txt") // <--------------------------- log file here
   val threadMap: Map[String,Seq[FunctionLog]] = mapThreads(funcLogs)
 
   threadMap.foreach { case (thread, logs) =>
@@ -43,7 +47,11 @@ object LogProc extends App {
   def parseLocalLogs(file: String): Seq[FunctionLog] = {
     val logFile = Source.fromFile(file, "utf-8")
     logFile.getLines
-      .filter(line => line.startsWith("---->") || line.startsWith("<----"))
+      .filter(line => (line.contains("---->") || line.contains("<----")))
+      .map(i => {
+        println(i)
+        i
+      })
       .map {
         case callPatternLog(timestampString, thread, func, args) =>
           val timestamp = LocalDateTime.parse(timestampString,formatter)
